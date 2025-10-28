@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SafeWay — Advanced Personal Safety Prototype</title>
+<style>
+:root{
+  --bg1:#071226; --bg2:#0f1724; --accent:#ff5c5c; --muted:#9aa4b2; --card:#0b1220;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,var(--bg1), var(--bg2));color:#e9f2f7}
+.container{max-width:980px;margin:18px auto;padding:16px}
+.header{display:flex;gap:12px;align-items:center}
+.logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(90deg,var(--accent),#ff2b2b);display:flex;align-items:center;justify-content:center;font-weight:700;color:white}
+.title h1{margin:0;font-size:18px}
+.grid{display:grid;grid-template-columns:1fr 360px;gap:16px;margin-top:14px}
+.card{background:rgba(255,255,255,0.03);padding:14px;border-radius:12px;box-shadow:0 8px 28px rgba(2,6,23,0.6)}
+.big-btn{width:100%;padding:18px;border-radius:14px;border:0;background:linear-gradient(180deg,var(--accent),#ff2b2b);color:white;font-weight:800;font-size:18px;cursor:pointer;box-shadow:0 10px 30px rgba(255,92,92,0.18)}
+.small-btn{padding:8px 10px;border-radius:10px;border:0;background:rgba(255,255,255,0.04);color:#e8f0f6;cursor:pointer}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.label{font-size:13px;color:var(--muted);margin-bottom:6px}
+.info{font-size:13px;color:var(--muted)}
+.log{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);padding:8px;border-radius:8px;overflow:auto;height:260px;font-family:monospace;font-size:13px}
+.tile{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);margin-bottom:8px}
+.input,select,textarea{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+.footer{margin-top:12px;font-size:12px;color:var(--muted);text-align:center}
+@media (max-width:900px){
+  .grid{grid-template-columns:1fr}
+  .log{height:200px}
+}
+.small{font-size:12px;color:var(--muted)}
+.badge{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+a.link{color:#9fe3ff;text-decoration:underline;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">SW</div>
+      <div class="title"><h1>SafeWay — Advanced Personal Safety Prototype</h1><div class="small">Auto-tracking + P2P live share (manual signaling) | Demo</div></div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button id="panicBtn" class="big-btn" title="Hold or Tap to trigger panic">🚨 PANIC</button>
+
+          <div class="tile"><div><strong>Current Location:</strong></div><div id="coords">—</div></div>
+          <div class="tile"><div><strong>Tracking Status:</strong></div><div id="trackingStatus" class="badge">Starting...</div></div>
+          <div class="tile"><div><strong>Battery:</strong></div><div id="battery">—</div></div>
+
+          <div>
+            <div class="label">Emergency Contacts (comma separated phone numbers)</div>
+            <input id="contacts" class="input" placeholder="+911234567890, +919876543210" />
+            <div class="small">Contacts are used to prefill SMS or notify connected peers via WebRTC datachannel.</div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="startShare" class="small-btn">Invite Family (Create Offer)</button>
+            <button id="acceptShare" class="small-btn">Connect as Family (Paste Offer)</button>
+            <button id="stopShare" class="small-btn">Stop Sharing</button>
+          </div>
+
+          <div style="margin-top:6px">
+            <div class="label">Manual signaling (copy/paste) box</div>
+            <textarea id="signalingBox" rows="4" class="input" placeholder="Offer / Answer will appear here. Copy & paste to other device."></textarea>
+            <div class="small">This demo uses manual signaling for P2P WebRTC (no server). For real apps, use a small signaling server.</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <select id="cameraSelect" class="input" style="flex:1"></select>
+            <button id="toggleCam" class="small-btn">Stream Camera</button>
+          </div>
+
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="capturePhoto" class="small-btn">Capture Photo</button>
+            <button id="recordAudio" class="small-btn">Record 10s Audio</button>
+            <button id="exportCSV" class="small-btn">Export CSV</button>
+            <button id="exportKML" class="small-btn">Export KML</button>
+            <button id="composeSMS" class="small-btn">Compose Emergency SMS</button>
+          </div>
+
+        </div>
+      </section>
+
+      <aside class="card">
+        <div>
+          <div class="label">Activity Log</div>
+          <div id="log" class="log"></div>
+
+          <div style="margin-top:10px">
+            <div class="label">Advanced Settings</div>
+            <div class="small">Check-in interval (minutes)</div>
+            <input id="checkinInterval" class="input" value="15" />
+            <div class="small" style="margin-top:6px">Stationary threshold (meters) and time (minutes) to auto-alert</div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <input id="stationaryMeters" class="input" value="50" />
+              <input id="stationaryMinutes" class="input" value="10" />
+            </div>
+            <div class="small" style="margin-top:6px">Battery alert threshold (%)</div>
+            <input id="batteryThreshold" class="input" value="20" />
+            <div class="small" style="margin-top:6px">Check-in reminder sound</div>
+            <button id="stopAlarm" class="small-btn">Stop Alarm</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="footer">
+      Notes: Some features (background SMS auto-send, true background persistent tracking) require a native Android service. WebRTC manual signaling used here for P2P live sharing.
+    </div>
+  </div>
+
+<!-- alarm sound -->
+<audio id="alarm" preload="auto">
+  <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+</audio>
+
+<script>
+/* =========================
+   SafeWay Advanced Prototype
+   - Auto-start tracking
+   - WebRTC P2P manual signaling for live location & camera stream
+   - Check-in reminders
+   - Battery monitoring
+   - Stationary detection
+   - Panic flows with alarm + share
+   Note: This is a client-side prototype; production requires native components/server for some flows.
+   ========================= */
+
+const logEl = document.getElementById('log');
+const coordsEl = document.getElementById('coords');
+const trackingStatusEl = document.getElementById('trackingStatus');
+const batteryEl = document.getElementById('battery');
+const contactsInput = document.getElementById('contacts');
+
+const panicBtn = document.getElementById('panicBtn');
+const startShareBtn = document.getElementById('startShare');
+const acceptShareBtn = document.getElementById('acceptShare');
+const stopShareBtn = document.getElementById('stopShare');
+const signalingBox = document.getElementById('signalingBox');
+const cameraSelect = document.getElementById('cameraSelect');
+const toggleCamBtn = document.getElementById('toggleCam');
+const capturePhotoBtn = document.getElementById('capturePhoto');
+const recordAudioBtn = document.getElementById('recordAudio');
+const exportCSVBtn = document.getElementById('exportCSV');
+const exportKMLBtn = document.getElementById('exportKML');
+const composeSMSBtn = document.getElementById('composeSMS');
+const stopAlarmBtn = document.getElementById('stopAlarm');
+
+const checkinIntervalInput = document.getElementById('checkinInterval');
+const stationaryMetersInput = document.getElementById('stationaryMeters');
+const stationaryMinutesInput = document.getElementById('stationaryMinutes');
+const batteryThresholdInput = document.getElementById('batteryThreshold');
+
+const alarmAudio = document.getElementById('alarm');
+
+let watchId = null;
+let trackingPoints = JSON.parse(localStorage.getItem('safe_points')||'[]'); // persisted route
+let lastPosition = null;
+let pc = null;              // RTCPeerConnection for sharing
+let dataChannel = null;     // datachannel for messages
+let localStream = null;     // camera stream
+let isSharing = false;
+let checkinTimer = null;
+let stationaryTimer = null;
+let lastMovementTime = Date.now();
+let batteryManager = null;
+let panicStreaming = false;
+
+// utility logging
+function appendLog(text){
+  const t = new Date().toLocaleTimeString();
+  logEl.innerHTML = `[${t}] ${text}<br>` + logEl.innerHTML;
+}
+appendLog('App started. Auto-tracking will begin (grant geolocation permissions).');
+
+// ---------------------------
+// Geolocation tracking auto-start
+// ---------------------------
+function startTracking(){
+  if(!('geolocation' in navigator)){
+    appendLog('Geolocation not supported.');
+    trackingStatusEl.textContent = 'Not supported';
+    return;
+  }
+  trackingStatusEl.textContent = 'Running';
+  if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(pos=>{
+    const p = {
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      alt: pos.coords.altitude,
+      accuracy: pos.coords.accuracy,
+      timestamp: new Date(pos.timestamp).toISOString()
+    };
+    trackingPoints.push(p);
+    if(trackingPoints.length>5000) trackingPoints.shift();
+    localStorage.setItem('safe_points', JSON.stringify(trackingPoints));
+    coordsEl.textContent = `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`;
+    lastPosition = p;
+    appendLog('Position recorded');
+    sendToPeers({type:'location', data:p});
+    // movement detection
+    if(trackingPoints.length>1){
+      const prev = trackingPoints[trackingPoints.length-2];
+      const d = haversine(prev.lat, prev.lon, p.lat, p.lon);
+      if(d > 10){ // moved more than 10m
+        lastMovementTime = Date.now();
+      }
+    } else {
+      lastMovementTime = Date.now();
+    }
+  }, err=>{
+    appendLog('Geo error: '+err.message);
+  }, {enableHighAccuracy:true, maximumAge:5000, timeout:10000});
+}
+startTracking();
+
+// Haversine distance (meters)
+function haversine(lat1, lon1, lat2, lon2){
+  const R = 6371000;
+  const toRad = v => v*Math.PI/180;
+  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R*c;
+}
+
+// ---------------------------
+// Battery monitoring
+// ---------------------------
+if(navigator.getBattery){
+  navigator.getBattery().then(b=>{
+    batteryManager = b;
+    function updateBattery(){
+      batteryEl.textContent = Math.round(b.level*100) + '% ' + (b.charging? '(charging)':'');
+      const threshold = Number(batteryThresholdInput.value || 20)/100;
+      if(!b.charging && b.level <= threshold){
+        appendLog(`Battery low: ${Math.round(b.level*100)}% — alerting contacts/peers`);
+        notifyLowBattery(Math.round(b.level*100));
+      }
+    }
+    updateBattery();
+    b.addEventListener('levelchange', updateBattery);
+    b.addEventListener('chargingchange', updateBattery);
+  });
+} else {
+  batteryEl.textContent = 'Not supported';
+}
+
+// notify low battery to peers or via SMS compose if no peers
+function notifyLowBattery(percent){
+  const message = {type:'battery_low', data:{percent, timestamp:new Date().toISOString(), lastLoc:lastPosition}};
+  appendLog('Sending battery alert to peers if connected.');
+  if(sendToPeers(message)) {
+    appendLog('Battery alert sent to connected peers.');
+  } else {
+    composeSMSWithMessage(`Battery low (${percent}%). Last location: ${formatLocationLink(lastPosition)}`);
+  }
+}
+
+// ---------------------------
+// Check-in reminders
+// ---------------------------
+function scheduleCheckin(){
+  if(checkinTimer) clearInterval(checkinTimer);
+  const min = Number(checkinIntervalInput.value || 15);
+  checkinTimer = setInterval(()=>{
+    appendLog('Check-in reminder: please confirm you are ok.');
+    const confirmed = confirm(`Check-in: Are you okay? (Auto-alert if you dismiss/no response in 45s)`);
+    if(confirmed){
+      appendLog('User confirmed check-in.');
+      sendToPeers({type:'checkin', data:{ok:true, timestamp:new Date().toISOString(), lastLoc:lastPosition}});
+    } else {
+      // wait 45 seconds for response, then alert
+      appendLog('No immediate check-in. Waiting 45s for response...');
+      setTimeout(()=>{
+        // if still no recent movement/confirmation => alert
+        const now = Date.now();
+        if(now - lastMovementTime > 45000){
+          appendLog('No response/movement — alerting contacts/peers.');
+          handleNoCheckin();
+        } else appendLog('Movement detected — no alert needed.');
+      },45000);
+    }
+  }, min*60*1000);
+}
+// start scheduling
+scheduleCheckin();
+checkinIntervalInput.addEventListener('change', scheduleCheckin);
+
+// if no check-in -> alert peers or compose SMS
+function handleNoCheckin(){
+  const message = {type:'no_checkin', data:{timestamp:new Date().toISOString(), lastLoc:lastPosition, route:getLastNPoints(20)}};
+  if(sendToPeers(message)){
+    appendLog('No-checkin alert sent to peers.');
+  } else {
+    composeSMSWithMessage(`No check-in from traveller. Last location: ${formatLocationLink(lastPosition)} Route: ${JSON.stringify(getLastNPoints(20))}`);
+  }
+}
+
+// ---------------------------
+// Stationary detection
+// ---------------------------
+function scheduleStationaryCheck(){
+  if(stationaryTimer) clearInterval(stationaryTimer);
+  const mins = Number(stationaryMinutesInput.value || 10);
+  const meters = Number(stationaryMetersInput.value || 50);
+  stationaryTimer = setInterval(()=>{
+    if(!trackingPoints.length) return;
+    const now = Date.now();
+    // compute movement in last X minutes
+    const cutoff = new Date(now - mins*60*1000).toISOString();
+    const recent = trackingPoints.filter(p=>p.timestamp >= cutoff);
+    if(recent.length < 2){
+      // insufficient data, check overall movement vs earliest
+      const first = trackingPoints[0];
+      const last = trackingPoints[trackingPoints.length-1];
+      const d = haversine(first.lat,first.lon,last.lat,last.lon);
+      if(d < meters){
+        appendLog('Stationary detected (insufficient recent points). Trigger alert.');
+        handleStationaryAlert();
+      }
+      return;
+    }
+    const first = recent[0], last = recent[recent.length-1];
+    const d = haversine(first.lat,first.lon,last.lat,last.lon);
+    if(d < meters){
+      appendLog(`Stationary detected in last ${mins} min (moved ${d.toFixed(1)} m). Alerting.`);
+      handleStationaryAlert();
+    } else {
+      appendLog(`Movement OK in last ${mins} min (moved ${d.toFixed(1)} m).`);
+      lastMovementTime = Date.now();
+    }
+  }, 60*1000); // check every minute
+}
+scheduleStationaryCheck();
+stationaryMetersInput.addEventListener('change', scheduleStationaryCheck);
+stationaryMinutesInput.addEventListener('change', scheduleStationaryCheck);
+
+function handleStationaryAlert(){
+  const message = {type:'stationary_alert', data:{timestamp:new Date().toISOString(), lastLoc:lastPosition, route:getLastNPoints(20)}};
+  if(sendToPeers(message)){
+    appendLog('Stationary alert sent to peers.');
+  } else {
+    composeSMSWithMessage(`Stationary alert: Traveller stationary/unreachable. Last location: ${formatLocationLink(lastPosition)} Route: ${JSON.stringify(getLastNPoints(20))}`);
+  }
+}
+
+// ---------------------------
+// Helper: get last N points
+// ---------------------------
+function getLastNPoints(n=20){
+  if(!trackingPoints.length) return [];
+  return trackingPoints.slice(Math.max(0, trackingPoints.length - n));
+}
+
+// ---------------------------
+// Compose SMS fallback
+// ---------------------------
+function composeSMSWithMessage(text){
+  appendLog('Opening SMS composer with message (user must send).');
+  // sms:body= works on many mobile browsers
+  const encoded = encodeURIComponent(text);
+  window.location.href = `sms:?body=${encoded}`;
+}
+
+// format location as google maps link
+function formatLocationLink(p){ if(!p) return 'unknown'; return `https://maps.google.com/?q=${p.lat},${p.lon}`; }
+
+// ---------------------------
+// Export CSV/KML
+// ---------------------------
+exportCSVBtn.addEventListener('click', ()=>{
+  if(!trackingPoints.length){ appendLog('No points to export'); return; }
+  const csv = 'timestamp,lat,lon,alt,accuracy\n' + trackingPoints.map(p=>`${p.timestamp},${p.lat},${p.lon},${p.alt||''},${p.accuracy||''}`).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'}); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='route.csv'; a.click(); URL.revokeObjectURL(url);
+  appendLog('Exported CSV');
+});
+exportKMLBtn.addEventListener('click', ()=>{
+  if(!trackingPoints.length){ appendLog('No points to export'); return; }
+  const coords = trackingPoints.map(p=>`${p.lon},${p.lat},0`).join('\n');
+  const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Route</name><Placemark><LineString><coordinates>${coords}</coordinates></LineString></Placemark></Document></kml>`;
+  const b = new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}); const u = URL.createObjectURL(b);
+  const a = document.createElement('a'); a.href=u; a.download='route.kml'; a.click(); URL.revokeObjectURL(u);
+  appendLog('Exported KML');
+});
+
+// ---------------------------
+// Photo capture
+// ---------------------------
+capturePhotoBtn.addEventListener('click', async ()=>{
+  try{
+    const s = await navigator.mediaDevices.getUserMedia({video:true});
+    const v = document.createElement('video'); v.srcObject = s; await v.play();
+    const c = document.createElement('canvas'); c.width = v.videoWidth || 1280; c.height = v.videoHeight || 720;
+    const ctx = c.getContext('2d'); ctx.drawImage(v,0,0,c.width,c.height);
+    const data = c.toDataURL('image/jpeg',0.85);
+    const photos = JSON.parse(localStorage.getItem('safe_photos')||'[]'); photos.push({ts:new Date().toISOString(), data}); localStorage.setItem('safe_photos', JSON.stringify(photos));
+    s.getTracks().forEach(t=>t.stop());
+    appendLog('Photo captured and saved locally.');
+    // notify peers
+    sendToPeers({type:'photo_captured', data:{timestamp:new Date().toISOString()}});
+  }catch(e){ appendLog('Photo capture failed: '+e.message); }
+});
+
+// audio record 10s
+recordAudioBtn.addEventListener('click', async ()=>{
+  try{
+    const s = await navigator.mediaDevices.getUserMedia({audio:true});
+    const mr = new MediaRecorder(s); const chunks=[];
+    mr.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data) };
+    mr.onstop = ()=>{
+      const blob = new Blob(chunks,{type:'audio/webm'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=`evidence_${Date.now()}.webm`; a.click();
+      appendLog('Audio recorded and downloaded.');
+      s.getTracks().forEach(t=>t.stop());
+    };
+    mr.start();
+    appendLog('Recording audio for 10s...');
+    setTimeout(()=>mr.stop(), 10000);
+  }catch(e){ appendLog('Audio capture failed: '+e.message) }
+});
+
+// ---------------------------
+// Compose SMS button for emergency
+// ---------------------------
+composeSMSBtn.addEventListener('click', ()=>{
+  if(!lastPosition) return alert('No location yet. Wait for GPS.');
+  const msg = `EMERGENCY! I need help. Location: ${formatLocationLink(lastPosition)} Time: ${new Date().toLocaleString()}`;
+  composeSMSWithMessage(msg);
+});
+
+// ---------------------------
+// Panic flow
+// ---------------------------
+panicBtn.addEventListener('click', async ()=>{
+  appendLog('PANIC triggered by user!');
+  // play alarm
+  try{
+    alarmAudio.volume = 1.0; alarmAudio.loop = true; await alarmAudio.play();
+  }catch(e){
+    appendLog('Autoplay blocked: user interaction required to enable audio.');
+  }
+  // send immediate location + route to peers
+  const panicMsg = {type:'panic', data:{timestamp:new Date().toISOString(), location:lastPosition, route:getLastNPoints(50)}};
+  if(sendToPeers(panicMsg)){
+    appendLog('Panic message sent to connected family peers.');
+    // instruct to start camera streaming
+    sendToPeers({type:'start_stream', data:{which:'front'}});
+  } else {
+    appendLog('No peers connected — Compose SMS fallback.');
+    composeSMSWithMessage(`PANIC! Need help. Location: ${formatLocationLink(lastPosition)}`);
+  }
+  // also open nearest police station in new tab (will open maps)
+  if(lastPosition){
+    const url = `https://www.google.com/maps/search/police/@${lastPosition.lat},${lastPosition.lon},15z`;
+    window.open(url,'_blank');
+  }
+});
+
+// Stop alarm
+stopAlarmBtn.addEventListener('click', ()=>{ alarmAudio.pause(); alarmAudio.currentTime = 0; appendLog('Alarm stopped'); });
+
+// ---------------------------
+// WebRTC P2P manual signaling for sharing location & camera stream
+// Manual copy/paste of SDP offer/answer into the signaling box
+// ---------------------------
+
+async function enumerateCameras(){
+  try{
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d=>d.kind==='videoinput');
+    cameraSelect.innerHTML = cams.map(c=>`<option value="${c.deviceId}">${c.label||'Camera '+(cams.indexOf(c)+1)}</option>`).join('');
+  }catch(e){ appendLog('Cannot enumerate cameras: '+e.message); }
+}
+enumerateCameras();
+navigator.mediaDevices.addEventListener('devicechange', enumerateCameras);
+
+startShareBtn.addEventListener('click', async ()=>{
+  // traveller creates an offer to share with family (copy/paste)
+  if(isSharing){ appendLog('Already sharing'); return; }
+  await createPeerConnection(true);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  signalingBox.value = JSON.stringify({type:'offer', sdp:offer.sdp});
+  appendLog('Offer created. Copy the Offer and send to family device (via phone call/WhatsApp).');
+});
+
+acceptShareBtn.addEventListener('click', async ()=>{
+  // accept an offer (family side) - paste offer, create answer, paste back
+  if(isSharing){ appendLog('Already connected'); return; }
+  const text = signalingBox.value.trim();
+  if(!text) return alert('Paste the Offer JSON into the signaling box first.');
+  try{
+    const obj = JSON.parse(text);
+    if(obj.type !== 'offer') return alert('Pasted JSON is not an offer.');
+    await createPeerConnection(false); // family side will set remote desc
+    const offerDesc = {type:'offer', sdp:obj.sdp};
+    await pc.setRemoteDescription(offerDesc);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    signalingBox.value = JSON.stringify({type:'answer', sdp:answer.sdp});
+    appendLog('Answer created. Copy Answer and send back to traveller.');
+  }catch(e){ appendLog('Error accepting offer: '+e.message); alert('Invalid offer JSON or error.'); }
+});
+
+stopShareBtn.addEventListener('click', ()=>{
+  closePeerConnection();
+  signalingBox.value = '';
+  appendLog('Sharing stopped.');
+});
+
+// If family receives the answer, traveller must paste it into signaling box to finish handshake
+signalingBox.addEventListener('change', async ()=>{
+  if(!pc || !pc.localDescription) return;
+  try{
+    const obj = JSON.parse(signalingBox.value.trim());
+    if(obj.type === 'answer'){
+      await pc.setRemoteDescription({type:'answer', sdp:obj.sdp});
+      appendLog('Answer applied. Connection should be established shortly.');
+    }
+  }catch(e){ /*ignore*/ }
+});
+
+// create PeerConnection and datachannel
+async function createPeerConnection(isOfferer){
+  pc = new RTCPeerConnection({
+    iceServers: [{urls:'stun:stun.l.google.com:19302'}]
+  });
+  // ICE logging
+  pc.onicecandidate = e=>{
+    // ICE candidates are automatically included in SDP for modern browsers using Trickle ICE; for manual signaling we rely on full SDP containing ICE
+    console.log('ICE candidate', e);
+  };
+  pc.onconnectionstatechange = ()=> appendLog('PC state: '+pc.connectionState);
+  // datachannel messages (family side will receive)
+  if(isOfferer){
+    dataChannel = pc.createDataChannel('safeway');
+    setupDataChannel();
+  } else {
+    pc.ondatachannel = (e)=>{ dataChannel = e.channel; setupDataChannel(); };
+  }
+
+  // when remote track arrives (family side) show note
+  pc.ontrack = e=>{
+    appendLog('Remote track received (family device). Media available.');
+    // Create video element in new window or within page for demo - open small preview
+    const stream = e.streams[0];
+    showRemoteStreamPreview(stream);
+  };
+
+  // add local camera if user wants to stream
+  // we don't auto-get camera here; traveller will trigger stream via toggleCamBtn which adds tracks to pc
+  isSharing = true;
+  appendLog('PeerConnection created. Awaiting handshake via signaling box.');
+}
+
+// setup datachannel events
+function setupDataChannel(){
+  dataChannel.onopen = ()=>{ appendLog('Data channel open'); };
+  dataChannel.onmessage = e=>{
+    try{
+      const msg = JSON.parse(e.data);
+      appendLog('Peer message: '+msg.type);
+      handlePeerMessage(msg);
+    }catch(err){
+      appendLog('Raw peer message: '+e.data);
+    }
+  };
+  dataChannel.onclose = ()=> appendLog('Data channel closed');
+}
+
+// send structured messages to peers (returns true if channel exists)
+function sendToPeers(obj){
+  if(dataChannel && dataChannel.readyState === 'open'){
+    try{ dataChannel.send(JSON.stringify(obj)); return true; }
+    catch(e){ appendLog('Failed to send to peers: '+e.message); return false; }
+  }
+  return false;
+}
+
+// handle messages received from peer (family receives alerts)
+function handlePeerMessage(msg){
+  if(msg.type === 'location'){
+    // family app can display live location on their UI (demo: log)
+    appendLog('(peer) location received: '+(msg.data? `${msg.data.lat.toFixed(6)},${msg.data.lon.toFixed(6)}` : 'no data'));
+  } else if(msg.type === 'panic'){
+    appendLog('(peer) PANIC: showing route & location. Consider calling emergency services.');
+    // optionally auto-open google maps
+    if(confirm('Peer triggered PANIC. Open map to location?')) window.open(`https://www.google.com/maps/search/?api=1&query=${msg.data.location.lat},${msg.data.location.lon}`);
+  } else if(msg.type === 'start_stream'){
+    // if family requests a stream, traveller should start camera streaming
+    appendLog('(peer) requested to start camera stream: '+(msg.data.which||'front'));
+    // family typically would already receive stream if traveller started it. This is demonstration.
+  } else if(msg.type === 'battery_low'){
+    appendLog(`(peer) battery low alert: ${msg.data.percent}%`);
+  } else if(msg.type === 'no_checkin' || msg.type === 'stationary_alert'){
+    appendLog(`(peer) alert: ${msg.type}`);
+  }
+}
+
+// show remote stream preview (family side)
+// opens new small window with stream for demo (or creates a video element in DOM)
+function showRemoteStreamPreview(stream){
+  // create popup
+  const w = window.open('', '_blank', 'width=480,height=640');
+  w.document.title = 'Live camera — SafeWay';
+  const v = w.document.createElement('video');
+  v.autoplay = true; v.playsInline = true; v.controls = true;
+  v.srcObject = stream;
+  w.document.body.style.margin='0'; w.document.body.style.background='#000';
+  w.document.body.appendChild(v);
+  appendLog('Preview opened in new window/tab (family).');
+}
+
+// toggle camera streaming (traveller initiates)
+toggleCamBtn.addEventListener('click', async ()=>{
+  if(localStream){
+    // stop streaming
+    localStream.getTracks().forEach(t=>t.stop());
+    localStream = null;
+    // remove senders from pc
+    if(pc){
+      pc.getSenders().forEach(s=>{ if(s.track) pc.removeTrack(s); });
+    }
+    toggleCamBtn.textContent = 'Stream Camera';
+    appendLog('Camera stream stopped.');
+    return;
+  }
+  // start camera with chosen deviceId
+  const deviceId = cameraSelect.value || undefined;
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({video:{deviceId: deviceId ? {exact:deviceId} : undefined}, audio:false});
+    // show small preview locally (optional)
+    const preview = document.createElement('video'); preview.autoplay=true; preview.muted=true; preview.playsInline=true; preview.style.width='100%';
+    preview.srcObject = localStream;
+    // insert preview temporarily into log area
+    const temp = document.createElement('div'); temp.appendChild(preview); logEl.prepend(temp);
+    appendLog('Local camera stream started. Adding tracks to PeerConnection if connected.');
+    // add tracks to peer connection
+    if(pc){
+      localStream.getTracks().forEach(track=>{
+        pc.addTrack(track, localStream);
+      });
+      appendLog('Camera tracks added to peer connection.');
+    } else appendLog('No peer connection active; stream will not be sent until connection established.');
+    toggleCamBtn.textContent = 'Stop Camera';
+  }catch(e){ appendLog('Could not start camera: '+e.message); }
+});
+
+// close pc gracefully
+function closePeerConnection(){
+  if(pc){
+    try{ pc.close(); }catch(e){}
+    pc = null;
+    dataChannel = null;
+  }
+  isSharing = false;
+}
+
+// ---------------------------
+// When page loads, if user is family and pastes an answer (traveller must also paste), accept it
+// We handle this via the signalingBox change listener above and by accepting answer manually.
+// ---------------------------
+
+// ---------------------------
+// When user grants camera/microphone access, they can stream to family
+// ---------------------------
+
+// ---------------------------
+// Save contacts to localStorage
+// ---------------------------
+contactsInput.value = localStorage.getItem('safe_contacts') || '';
+contactsInput.addEventListener('change', ()=> localStorage.setItem('safe_contacts', contactsInput.value));
+
+// ---------------------------
+// If page unloads, stop alarm and streams
+// ---------------------------
+window.addEventListener('beforeunload', ()=>{ if(alarmAudio){ alarmAudio.pause(); alarmAudio.currentTime=0 } });
+
+// ---------------------------
+// Notes & safety: The prototype demonstrates an end-to-end browser flow.
+// For production: implement secure authentication, a real signaling server for WebRTC, native background services for continuous location & automatic SMS, secure cloud storage for evidence, and encryption for any stored data.
+// ---------------------------
+
+appendLog('Prototype ready. Use "Invite Family" to create an offer, send it to family device, family should paste it in "Connect as Family" and send back the Answer. Once connected, location & media can be shared P2P.');
+</script>
+</body>
+</html>
